@@ -1,0 +1,404 @@
+.App {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+  background-color: #f5f5f5;
+  min-height: 100vh;
+}
+
+.App-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+  padding: 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 8px;
+  color: white;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.App-header h1 {
+  margin: 0;
+  font-size: 24px;
+  flex: 1;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.controls label {
+  font-weight: 600;
+}
+
+#env-select {
+  padding: 8px 12px;
+  border-radius: 5px;
+  border: none;
+  font-size: 14px;
+  cursor: pointer;
+  background: white;
+  color: #333;
+}
+
+.refresh-btn {
+  padding: 8px 16px;
+  background: white;
+  color: #667eea;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: all 0.2s;
+}
+
+.refresh-btn:hover:not(:disabled) {
+  transform: scale(1.05);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.refresh-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.App-main {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.stats {
+  margin-bottom: 20px;
+  color: #666;
+  font-size: 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.bulk-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.bulk-btn {
+  padding: 6px 12px;
+  background: #e9ecef;
+  color: #495057;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s;
+}
+
+.bulk-btn:hover {
+  background: #dee2e6;
+  border-color: #adb5bd;
+}
+
+.grouped-table-container {
+  margin-top: 20px;
+}
+
+.customer-group {
+  margin-bottom: 15px;
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.customer-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: linear-gradient(to right, #f8f9fa, #e9ecef);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.2s;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.customer-header:hover {
+  background: linear-gradient(to right, #e9ecef, #dee2e6);
+}
+
+.toggle-icon {
+  font-size: 10px;
+  color: #667eea;
+  transition: transform 0.2s;
+  display: inline-block;
+}
+
+.toggle-icon.expanded {
+  transform: rotate(90deg);
+}
+
+.toggle-icon.collapsed {
+  transform: rotate(0deg);
+}
+
+.customer-name {
+  font-weight: 700;
+  font-size: 16px;
+  color: #333;
+  flex: 1;
+}
+
+.deployment-count {
+  font-size: 12px;
+  color: #666;
+  background: #667eea;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.deployment-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.deployment-table th {
+  background-color: #667eea;
+  color: white;
+  padding: 10px 12px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.deployment-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #eee;
+  font-size: 13px;
+}
+
+.deployment-table tr:last-child td {
+  border-bottom: none;
+}
+
+.deployment-table tr:hover {
+  background-color: #f8f9fa;
+}
+
+.badge {
+  padding: 4px 10px;
+  border-radius: 12px;
+  color: white;
+  font-size: 11px;
+  font-weight: bold;
+  display: inline-block;
+}
+
+.commit {
+  font-family: monospace;
+  color: #666;
+  font-size: 12px;
+}
+
+.commit-link {
+  color: #0366d6;
+  text-decoration: none;
+  font-weight: 600;
+  transition: color 0.2s;
+}
+
+.commit-link:hover {
+  color: #0969da;
+  text-decoration: underline;
+}
+
+.commit-link:active {
+  color: #053d82;
+}
+
+.loading, .error, .no-data {
+  text-align: center;
+  padding: 40px;
+  font-size: 16px;
+  color: #666;
+}
+
+.error {
+  color: #dc3545;
+  background-color: #fff5f5;
+  border-radius: 5px;
+  border: 1px solid #dc3545;
+}
+
+.no-data {
+  color: #6c757d;
+  font-style: italic;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .App-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .controls {
+    justify-content: space-between;
+  }
+  
+  .deployment-table {
+    font-size: 11px;
+  }
+  
+  .deployment-table th,
+  .deployment-table td {
+    padding: 8px 6px;
+  }
+  
+  .customer-header {
+    flex-wrap: wrap;
+  }
+}
+
+/* Add this to your App.css */
+
+.header-title {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.app-logo {
+  height: 40px; /* Adjust size as needed */
+  width: auto;
+  object-fit: contain;
+}
+
+/* Optional: Adjust header layout if needed */
+.App-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+  padding: 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 8px;
+  color: white;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.App-header h1 {
+  margin: 0;
+  font-size: 24px;
+  /* Remove flex: 1 if you want the title to sit right next to the logo */
+  flex: 0 0 auto; 
+}
+
+.load-history-container {
+  padding: 15px;
+  text-align: center;
+  background-color: #f8f9fa;
+  border-top: 1px dashed #dee2e6;
+}
+
+.load-history-btn {
+  background-color: #6c757d;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background 0.2s;
+}
+
+.load-history-btn:hover:not(:disabled) {
+  background-color: #5a6268;
+}
+
+.load-history-btn:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.history-section {
+  margin-top: 10px;
+  border-top: 2px solid #e9ecef;
+  padding-top: 10px;
+}
+
+.history-title {
+  font-size: 14px;
+  color: #6c757d;
+  margin: 0 0 10px 0;
+  font-weight: 600;
+}
+
+.history-table {
+  background-color: #fafafa;
+}
+
+.history-table tbody tr:nth-child(even) {
+  background-color: #f1f1f1;
+}
+
+/* ... existing styles ... */
+
+.highlight-row {
+  background-color: #e6fffa !important; /* Light green background */
+  transition: background-color 0.3s ease;
+}
+
+.highlight-row:hover {
+  background-color: #b2f5ea !important; /* Slightly darker on hover */
+}
+
+/* Ensure the badge text remains readable */
+.highlight-row .badge {
+  color: white;
+}
+
+/* ... existing styles ... */
+
+/* Add width for the new status column */
+.deployment-table th:last-child,
+.deployment-table td:last-child {
+  width: 80px;
+  text-align: center;
+}
+
+.new-badge {
+  display: inline-block;
+  background-color: #28a745; /* Green */
+  color: white;
+  font-size: 10px;
+  font-weight: bold;
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+/* Ensure the highlight row background doesn't hide the badge */
+.highlight-row .new-badge {
+  background-color: #28a745;
+  color: white;
+}
+
+/* Adjust table header alignment */
+.deployment-table th {
+  text-align: left;
+}
+.deployment-table th:last-child {
+  text-align: center;
+}
