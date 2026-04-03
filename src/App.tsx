@@ -66,34 +66,43 @@ function App() {
     return Array.from(map.values());
   };
 
-  const initializeGroups = (latestList: Deployment[]): CustomerGroup[] => {
-    const map = new Map<string, Deployment[]>();
-    
-    latestList.forEach((dep) => {
-      if (!map.has(dep.customer)) {
-        map.set(dep.customer, []);
-      }
-      map.get(dep.customer)!.push(dep);
-    });
-
-    const result: CustomerGroup[] = Array.from(map.entries()).map(([customer, deps]) => {
-      const sortedDeps = deps.sort(
-        (a, b) => new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime()
-      );
+    const initializeGroups = (latestList: Deployment[]): CustomerGroup[] => {
+      const map = new Map<string, Deployment[]>();
       
-      const latest = sortedDeps.slice(0, 3);
-      const history = sortedDeps.slice(3);
-      
-      return {
-        customer,
-        latest,
-        history,
-        isExpanded: true,
-        loadingHistory: false
-      };
-    });
+      latestList.forEach((dep) => {
+        if (!map.has(dep.customer)) {
+          map.set(dep.customer, []);
+        }
+        map.get(dep.customer)!.push(dep);
+      });
 
-    return result.sort((a, b) => a.customer.localeCompare(b.customer));
+      const result: CustomerGroup[] = Array.from(map.entries()).map(([customer, deps]) => {
+        // Sort deployments for this customer by date (newest first)
+        const sortedDeps = deps.sort(
+          (a, b) => new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime()
+        );
+        
+        const latest = sortedDeps.slice(0, 3);
+        const history = sortedDeps.slice(3);
+        
+        return {
+          customer,
+          latest,
+          history,
+          isExpanded: true,
+          loadingHistory: false
+        };
+      });
+
+    // 🔥 CHANGED: Sort customers by their MOST RECENT deployment date (descending)
+    return result.sort((a, b) => {
+      // Get the date of the very first (newest) deployment for each customer
+      const dateA = a.latest.length > 0 ? new Date(a.latest[0].releaseDate).getTime() : 0;
+      const dateB = b.latest.length > 0 ? new Date(b.latest[0].releaseDate).getTime() : 0;
+      
+      // Sort descending (newest first)
+      return dateB - dateA;
+    });
   };
 
   const fetchDeployments = async (env: Environment) => {
