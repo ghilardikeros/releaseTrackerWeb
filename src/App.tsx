@@ -318,6 +318,7 @@ function App() {
                           <th>Project</th>
                           <th>Environment</th>
                           <th>Branch</th>
+                          <th>Build Date</th>
                           <th>Commit</th>
                           <th>Deployer</th>
                           <th>Release Date</th>
@@ -333,9 +334,10 @@ function App() {
                               <td>
                                 <span className="badge" style={{ backgroundColor: getEnvironmentBadge(dep.environment) }}>
                                   {dep.environment}
-                                </span>
+                                </span>                                
                               </td>
-                              <td>{dep.branch}</td>
+                              <td><b>{dep.branch}</b></td>
+                              <td>{formatDate(dep.buildDate)}</td>
                               <td className="commit">
                                 <a href={getGitHubUrl(dep.commit)} target="_blank" rel="noopener noreferrer" className="commit-link">
                                   {dep.commit.substring(0, 7)} ↗
