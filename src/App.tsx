@@ -66,41 +66,38 @@ function App() {
     return Array.from(map.values());
   };
 
-    const initializeGroups = (latestList: Deployment[]): CustomerGroup[] => {
-      const map = new Map<string, Deployment[]>();
+  const initializeGroups = (latestList: Deployment[]): CustomerGroup[] => {
+    const map = new Map<string, Deployment[]>();
+    
+    latestList.forEach((dep) => {
+      if (!map.has(dep.customer)) {
+        map.set(dep.customer, []);
+      }
+      map.get(dep.customer)!.push(dep);
+    });
+
+    const result: CustomerGroup[] = Array.from(map.entries()).map(([customer, deps]) => {
+      // Sort deployments for this customer by date (newest first)
+      const sortedDeps = deps.sort(
+        (a, b) => new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime()
+      );
       
-      latestList.forEach((dep) => {
-        if (!map.has(dep.customer)) {
-          map.set(dep.customer, []);
-        }
-        map.get(dep.customer)!.push(dep);
-      });
+      const latest = sortedDeps.slice(0, 3);
+      const history = sortedDeps.slice(3);
+      
+      return {
+        customer,
+        latest,
+        history,
+        isExpanded: true,
+        loadingHistory: false
+      };
+    });
 
-      const result: CustomerGroup[] = Array.from(map.entries()).map(([customer, deps]) => {
-        // Sort deployments for this customer by date (newest first)
-        const sortedDeps = deps.sort(
-          (a, b) => new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime()
-        );
-        
-        const latest = sortedDeps.slice(0, 3);
-        const history = sortedDeps.slice(3);
-        
-        return {
-          customer,
-          latest,
-          history,
-          isExpanded: true,
-          loadingHistory: false
-        };
-      });
-
-    // 🔥 CHANGED: Sort customers by their MOST RECENT deployment date (descending)
+    // Sort customers by their MOST RECENT deployment date (descending)
     return result.sort((a, b) => {
-      // Get the date of the very first (newest) deployment for each customer
       const dateA = a.latest.length > 0 ? new Date(a.latest[0].releaseDate).getTime() : 0;
       const dateB = b.latest.length > 0 ? new Date(b.latest[0].releaseDate).getTime() : 0;
-      
-      // Sort descending (newest first)
       return dateB - dateA;
     });
   };
@@ -312,6 +309,7 @@ function App() {
 
                 {group.isExpanded && (
                   <>
+                    {/* MAIN TABLE (Latest 3) */}
                     <table className="deployment-table">
                       <thead>
                         <tr>
@@ -322,7 +320,7 @@ function App() {
                           <th>Commit</th>
                           <th>Deployer</th>
                           <th>Release Date</th>
-                          <th>Status</th> {/* New Column Header */}
+                          <th>Status</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -354,6 +352,7 @@ function App() {
                       </tbody>
                     </table>
 
+                    {/* HISTORY TABLE (Older) */}
                     {group.history.length > 0 && (
                       <div className="history-section">
                         <h4 className="history-title">Older Deployments</h4>
@@ -363,10 +362,11 @@ function App() {
                               <th>Project</th>
                               <th>Environment</th>
                               <th>Branch</th>
+                              <th>Build Date</th> {/* ✅ ADDED HERE */}
                               <th>Commit</th>
                               <th>Deployer</th>
                               <th>Release Date</th>
-                              <th>Status</th> {/* New Column Header */}
+                              <th>Status</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -380,7 +380,8 @@ function App() {
                                       {dep.environment}
                                     </span>
                                   </td>
-                                  <td>{dep.branch}</td>
+                                  <td><b>{dep.branch}</b></td> {/* ✅ Made bold for consistency */}
+                                  <td>{formatDate(dep.buildDate)}</td> {/* ✅ ADDED HERE */}
                                   <td className="commit">
                                     <a href={getGitHubUrl(dep.commit)} target="_blank" rel="noopener noreferrer" className="commit-link">
                                       {dep.commit.substring(0, 7)} ↗
