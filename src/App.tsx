@@ -82,8 +82,8 @@ function App() {
         (a, b) => new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime()
       );
       
-      const latest = sortedDeps.slice(0, 3);
-      const history = sortedDeps.slice(3);
+      const latest = sortedDeps.slice(0, 5);
+      const history = sortedDeps.slice(5);
       
       return {
         customer,
