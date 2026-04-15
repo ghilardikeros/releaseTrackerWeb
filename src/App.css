@@ -404,3 +404,22 @@
 .deployment-table th:last-child {
   text-align: center;
 }
+
+.alert-badge {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 16px;
+  cursor: help;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+
+/* Ensure the alert badge is visible on highlighted rows */
+.highlight-row .alert-badge {
+  filter: drop-shadow(0 0 2px rgba(255, 0, 0, 0.5));
+}

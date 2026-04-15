@@ -3,6 +3,7 @@ import './App.css';
 
 import companyLogo from './assets/logo.png';
 
+// 🔥 UPDATED INTERFACE to include uncommitted change fields
 interface Deployment {
   customer: string;
   project: string;
@@ -13,6 +14,11 @@ interface Deployment {
   email: string;
   releaseDate: string;
   buildDate: string;
+  // Add these fields from your API response
+  totalUncommitted?: number;
+  untrackedFiles?: string[];
+  modifiedFiles?: string[];
+  stagedFiles?: string[];
 }
 
 interface ApiResponse {
@@ -54,6 +60,17 @@ function App() {
     return diffDays <= 7;
   };
 
+  // 🔥 NEW HELPER: Check for uncommitted changes
+  const hasUncommittedChanges = (dep: Deployment): boolean => {
+    if (!dep) return false;
+    const hasTotal = (dep.totalUncommitted ?? 0) > 0;
+    const hasUntracked = (dep.untrackedFiles?.length ?? 0) > 0;
+    const hasModified = (dep.modifiedFiles?.length ?? 0) > 0;
+    const hasStaged = (dep.stagedFiles?.length ?? 0) > 0;
+    
+    return hasTotal || hasUntracked || hasModified || hasStaged;
+  };
+
   const getLatestDeployments = (data: Deployment[]): Deployment[] => {
     const map = new Map<string, Deployment>();
     data.forEach((dep) => {
@@ -77,7 +94,6 @@ function App() {
     });
 
     const result: CustomerGroup[] = Array.from(map.entries()).map(([customer, deps]) => {
-      // Sort deployments for this customer by date (newest first)
       const sortedDeps = deps.sort(
         (a, b) => new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime()
       );
@@ -94,7 +110,6 @@ function App() {
       };
     });
 
-    // Sort customers by their MOST RECENT deployment date (descending)
     return result.sort((a, b) => {
       const dateA = a.latest.length > 0 ? new Date(a.latest[0].releaseDate).getTime() : 0;
       const dateB = b.latest.length > 0 ? new Date(b.latest[0].releaseDate).getTime() : 0;
@@ -195,11 +210,34 @@ function App() {
     );
   };
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string): string => {
     if (dateString === '0001-01-01T00:00:00') return '-';
-    const date = new Date(dateString);
-    const pad = (num: number) => num.toString().padStart(2, '0');
-    return date.getFullYear() + '/' + pad(date.getMonth() + 1) + '/' + pad(date.getDate()) + ' ' + pad(date.getHours()) + ':' + pad(date.getMinutes());
+    
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return '-';
+
+      const formatter = new Intl.DateTimeFormat('it-IT', {
+        timeZone: 'Europe/Rome',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      });
+
+      const parts = formatter.formatToParts(date);
+      const partMap: Record<string, string> = {};
+      parts.forEach(({ type, value }) => {
+        partMap[type] = value;
+      });
+
+      return `${partMap.year}/${partMap.month}/${partMap.day} ${partMap.hour}:${partMap.minute}`;
+      
+    } catch (e) {
+      return '-';
+    }
   };
 
   const getEnvironmentBadge = (env: string) => {
@@ -309,7 +347,6 @@ function App() {
 
                 {group.isExpanded && (
                   <>
-                    {/* MAIN TABLE (Latest 3) */}
                     <table className="deployment-table">
                       <thead>
                         <tr>
@@ -326,6 +363,8 @@ function App() {
                       <tbody>
                         {group.latest.map((dep, idx) => {
                           const isRecent = isNewDeployment(dep.releaseDate);
+                          const hasChanges = hasUncommittedChanges(dep);
+                          
                           return (
                             <tr key={group.customer + '-latest-' + idx} className={isRecent ? 'highlight-row' : ''}>
                               <td>{dep.project}</td>
@@ -340,6 +379,15 @@ function App() {
                                 <a href={getGitHubUrl(dep.commit)} target="_blank" rel="noopener noreferrer" className="commit-link">
                                   {dep.commit.substring(0, 7)} ↗
                                 </a>
+                                {/* 🔥 ALERT ICON LOGIC */}
+                                {hasChanges && (
+                                  <span 
+                                    className="alert-badge" 
+                                    title={`Uncommitted changes`}
+                                  >
+                                    ⚠️
+                                  </span>
+                                )}
                               </td>
                               <td>{dep.user}</td>
                               <td>{formatDate(dep.releaseDate)}</td>
@@ -352,7 +400,6 @@ function App() {
                       </tbody>
                     </table>
 
-                    {/* HISTORY TABLE (Older) */}
                     {group.history.length > 0 && (
                       <div className="history-section">
                         <h4 className="history-title">Older Deployments</h4>
@@ -362,7 +409,7 @@ function App() {
                               <th>Project</th>
                               <th>Environment</th>
                               <th>Branch</th>
-                              <th>Build Date</th> {/* ✅ ADDED HERE */}
+                              <th>Build Date</th>
                               <th>Commit</th>
                               <th>Deployer</th>
                               <th>Release Date</th>
@@ -372,6 +419,8 @@ function App() {
                           <tbody>
                             {group.history.map((dep, idx) => {
                               const isRecent = isNewDeployment(dep.releaseDate);
+                              const hasChanges = hasUncommittedChanges(dep);
+
                               return (
                                 <tr key={group.customer + '-hist-' + idx} className={isRecent ? 'highlight-row' : ''}>
                                   <td>{dep.project}</td>
@@ -380,12 +429,21 @@ function App() {
                                       {dep.environment}
                                     </span>
                                   </td>
-                                  <td><b>{dep.branch}</b></td> {/* ✅ Made bold for consistency */}
-                                  <td>{formatDate(dep.buildDate)}</td> {/* ✅ ADDED HERE */}
+                                  <td><b>{dep.branch}</b></td>
+                                  <td>{formatDate(dep.buildDate)}</td>
                                   <td className="commit">
                                     <a href={getGitHubUrl(dep.commit)} target="_blank" rel="noopener noreferrer" className="commit-link">
                                       {dep.commit.substring(0, 7)} ↗
                                     </a>
+                                    {/* 🔥 ALERT ICON LOGIC */}
+                                    {hasChanges && (
+                                      <span 
+                                        className="alert-badge" 
+                                        title={`Uncommitted changes`}
+                                      >
+                                        ⚠️
+                                      </span>
+                                    )}
                                   </td>
                                   <td>{dep.user}</td>
                                   <td>{formatDate(dep.releaseDate)}</td>
