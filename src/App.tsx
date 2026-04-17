@@ -18,8 +18,8 @@ interface Deployment {
   untrackedFiles?: string[];
   modifiedFiles?: string[];
   stagedFiles?: string[];
-  tag?: string | null;      // 🔥 New field
-  notes?: string | null;    // 🔥 New field
+  tag?: string | null;
+  notes?: string | null;
 }
 
 interface ApiResponse {
@@ -228,7 +228,13 @@ function App() {
     return colors[env] || '#6c757d';
   };
 
-  const getGitHubUrl = (commitHash: string) => {
+  // 🔥 UPDATED: Conditional GitHub URL based on project
+  const getGitHubUrl = (commitHash: string, project?: string): string => {
+    // SAGA project uses Azure DevOps (Visual Studio)
+    if (project === 'SAGA') {
+      return 'https://keros-projects.visualstudio.com/Keros/_git/Keros.ServiceBus/commit/' + commitHash;
+    }
+    // Default: GitHub
     return 'https://github.com/' + GITHUB_ORG + '/' + GITHUB_REPO + '/commit/' + commitHash;
   };
 
@@ -320,7 +326,7 @@ function App() {
                           <th>Commit</th>
                           <th>Deployer</th>
                           <th>Release Date</th>
-                          <th>Notes</th> {/* 🔥 New Column */}
+                          <th>Notes</th>
                           <th>Status</th>
                         </tr>
                       </thead>
@@ -333,7 +339,6 @@ function App() {
                             <tr key={group.customer + '-latest-' + idx} className={isRecent ? 'highlight-row' : ''}>
                               <td>
                                 <div>{dep.project}</div>
-                                {/* 🔥 TAG DISPLAY */}
                                 {dep.tag && <span className="project-tag">{dep.tag}</span>}
                               </td>
                               <td>
@@ -344,7 +349,8 @@ function App() {
                               <td><b>{dep.branch}</b></td>
                               <td>{formatDate(dep.buildDate)}</td>
                               <td className="commit">
-                                <a href={getGitHubUrl(dep.commit)} target="_blank" rel="noopener noreferrer" className="commit-link">
+                                {/* 🔥 PASS PROJECT NAME TO getGitHubUrl */}
+                                <a href={getGitHubUrl(dep.commit, dep.project)} target="_blank" rel="noopener noreferrer" className="commit-link">
                                   {dep.commit.substring(0, 7)} ↗
                                 </a>
                                 {hasChanges && (
@@ -354,7 +360,6 @@ function App() {
                               <td>{dep.user}</td>
                               <td>{formatDate(dep.releaseDate)}</td>
                               <td className="notes-cell">
-                                {/* 🔥 NOTES ICON */}
                                 {dep.notes && (
                                   <span className="notes-icon" title={dep.notes}>📄</span>
                                 )}
@@ -405,7 +410,8 @@ function App() {
                                   <td><b>{dep.branch}</b></td>
                                   <td>{formatDate(dep.buildDate)}</td>
                                   <td className="commit">
-                                    <a href={getGitHubUrl(dep.commit)} target="_blank" rel="noopener noreferrer" className="commit-link">
+                                    {/* 🔥 PASS PROJECT NAME TO getGitHubUrl */}
+                                    <a href={getGitHubUrl(dep.commit, dep.project)} target="_blank" rel="noopener noreferrer" className="commit-link">
                                       {dep.commit.substring(0, 7)} ↗
                                     </a>
                                     {hasChanges && (
