@@ -3,7 +3,7 @@ import './App.css';
 
 import companyLogo from './assets/logo.png';
 
-// 🔥 UPDATED INTERFACE to include uncommitted change fields
+// 🔥 UPDATED INTERFACE
 interface Deployment {
   customer: string;
   project: string;
@@ -14,11 +14,12 @@ interface Deployment {
   email: string;
   releaseDate: string;
   buildDate: string;
-  // Add these fields from your API response
   totalUncommitted?: number;
   untrackedFiles?: string[];
   modifiedFiles?: string[];
   stagedFiles?: string[];
+  tag?: string | null;      // 🔥 New field
+  notes?: string | null;    // 🔥 New field
 }
 
 interface ApiResponse {
@@ -50,7 +51,6 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [selectedEnv, setSelectedEnv] = useState<Environment>('PROD');
 
-  // Helper: Check if date is within last 7 days
   const isNewDeployment = (dateString: string): boolean => {
     if (dateString === '0001-01-01T00:00:00') return false;
     const deployDate = new Date(dateString);
@@ -60,14 +60,12 @@ function App() {
     return diffDays <= 7;
   };
 
-  // 🔥 NEW HELPER: Check for uncommitted changes
   const hasUncommittedChanges = (dep: Deployment): boolean => {
     if (!dep) return false;
     const hasTotal = (dep.totalUncommitted ?? 0) > 0;
     const hasUntracked = (dep.untrackedFiles?.length ?? 0) > 0;
     const hasModified = (dep.modifiedFiles?.length ?? 0) > 0;
     const hasStaged = (dep.stagedFiles?.length ?? 0) > 0;
-    
     return hasTotal || hasUntracked || hasModified || hasStaged;
   };
 
@@ -118,31 +116,22 @@ function App() {
   };
 
   const fetchDeployments = async (env: Environment) => {
-    console.log(`🚀 Fetching deployments for ${env}...`);
     setLoading(true);
     setError(null);
-    
     const apiUrl = API_BASE_URL + '/release/all/' + env;
-    console.log('📡 Request URL:', apiUrl);
 
     try {
       const response = await fetch(apiUrl);
-      
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`HTTP ${response.status}: ${errorText || response.statusText}`);
       }
-      
       const data: ApiResponse = await response.json();
-      console.log(`✅ Received ${data.results.length} results.`);
-      
       setDeployments(data.results);
       const latestList = getLatestDeployments(data.results);
       setCustomerGroups(initializeGroups(latestList));
-      
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Unknown error occurred';
-      console.error('❌ Fetch Error:', errorMsg);
       setError(errorMsg);
     } finally {
       setLoading(false);
@@ -187,7 +176,6 @@ function App() {
           loadingHistory: false
         };
       }));
-
     } catch (err) {
       console.error('Error loading history:', err);
       setCustomerGroups(prev => prev.map(group => 
@@ -212,11 +200,9 @@ function App() {
 
   const formatDate = (dateString: string): string => {
     if (dateString === '0001-01-01T00:00:00') return '-';
-    
     try {
       const date = new Date(dateString);
       if (isNaN(date.getTime())) return '-';
-
       const formatter = new Intl.DateTimeFormat('it-IT', {
         timeZone: 'Europe/Rome',
         year: 'numeric',
@@ -226,18 +212,11 @@ function App() {
         minute: '2-digit',
         hour12: false
       });
-
       const parts = formatter.formatToParts(date);
       const partMap: Record<string, string> = {};
-      parts.forEach(({ type, value }) => {
-        partMap[type] = value;
-      });
-
+      parts.forEach(({ type, value }) => { partMap[type] = value; });
       return `${partMap.year}/${partMap.month}/${partMap.day} ${partMap.hour}:${partMap.minute}`;
-      
-    } catch (e) {
-      return '-';
-    }
+    } catch (e) { return '-'; }
   };
 
   const getEnvironmentBadge = (env: string) => {
@@ -261,18 +240,13 @@ function App() {
 
   useEffect(() => {
     fetchDeployments(selectedEnv);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
     <div className="App">
       <header className="App-header">
         <div className="header-title">
-          <img 
-            src={companyLogo} 
-            alt="Company Logo" 
-            className="app-logo" 
-          />
+          <img src={companyLogo} alt="Company Logo" className="app-logo" />
           <h1>Deploy Tracker</h1>
         </div>
         <div className="controls">
@@ -287,23 +261,14 @@ function App() {
             <option value="STAGE">STAGE</option>
             <option value="TEST">TEST</option>
           </select>
-          <button 
-            onClick={() => fetchDeployments(selectedEnv)} 
-            disabled={loading}
-            className="refresh-btn"
-          >
+          <button onClick={() => fetchDeployments(selectedEnv)} disabled={loading} className="refresh-btn">
             {loading ? 'Loading...' : 'Refresh'}
           </button>
         </div>
       </header>
       
       <main className="App-main">
-        {loading && (
-          <div className="loading">
-            <div className="spinner"></div>
-            <p>Loading data from {selectedEnv}...</p>
-          </div>
-        )}
+        {loading && <div className="loading"><div className="spinner"></div><p>Loading data from {selectedEnv}...</p></div>}
         
         {error && (
           <div className="error-box">
@@ -332,10 +297,7 @@ function App() {
 
             {customerGroups.map((group, groupIndex) => (
               <div key={group.customer} className="customer-group">
-                <div 
-                  className="customer-header"
-                  onClick={() => toggleCustomerGroup(groupIndex)}
-                >
+                <div className="customer-header" onClick={() => toggleCustomerGroup(groupIndex)}>
                   <span className={'toggle-icon ' + (group.isExpanded ? 'expanded' : 'collapsed')}>▶</span>
                   <span className="customer-name">{group.customer}</span>
                   <span className="deployment-count">
@@ -347,6 +309,7 @@ function App() {
 
                 {group.isExpanded && (
                   <>
+                    {/* MAIN TABLE */}
                     <table className="deployment-table">
                       <thead>
                         <tr>
@@ -357,6 +320,7 @@ function App() {
                           <th>Commit</th>
                           <th>Deployer</th>
                           <th>Release Date</th>
+                          <th>Notes</th> {/* 🔥 New Column */}
                           <th>Status</th>
                         </tr>
                       </thead>
@@ -367,7 +331,11 @@ function App() {
                           
                           return (
                             <tr key={group.customer + '-latest-' + idx} className={isRecent ? 'highlight-row' : ''}>
-                              <td>{dep.project}</td>
+                              <td>
+                                <div>{dep.project}</div>
+                                {/* 🔥 TAG DISPLAY */}
+                                {dep.tag && <span className="project-tag">{dep.tag}</span>}
+                              </td>
                               <td>
                                 <span className="badge" style={{ backgroundColor: getEnvironmentBadge(dep.environment) }}>
                                   {dep.environment}
@@ -379,18 +347,18 @@ function App() {
                                 <a href={getGitHubUrl(dep.commit)} target="_blank" rel="noopener noreferrer" className="commit-link">
                                   {dep.commit.substring(0, 7)} ↗
                                 </a>
-                                {/* 🔥 ALERT ICON LOGIC */}
                                 {hasChanges && (
-                                  <span 
-                                    className="alert-badge" 
-                                    title={`Uncommitted changes`}
-                                  >
-                                    ⚠️
-                                  </span>
+                                  <span className="alert-badge" title={`Uncommitted changes: ${dep.totalUncommitted || 0} files`}>⚠️</span>
                                 )}
                               </td>
                               <td>{dep.user}</td>
                               <td>{formatDate(dep.releaseDate)}</td>
+                              <td className="notes-cell">
+                                {/* 🔥 NOTES ICON */}
+                                {dep.notes && (
+                                  <span className="notes-icon" title={dep.notes}>📄</span>
+                                )}
+                              </td>
                               <td>
                                 {isRecent && <span className="new-badge">NEW</span>}
                               </td>
@@ -400,6 +368,7 @@ function App() {
                       </tbody>
                     </table>
 
+                    {/* HISTORY TABLE */}
                     {group.history.length > 0 && (
                       <div className="history-section">
                         <h4 className="history-title">Older Deployments</h4>
@@ -413,6 +382,7 @@ function App() {
                               <th>Commit</th>
                               <th>Deployer</th>
                               <th>Release Date</th>
+                              <th>Notes</th>
                               <th>Status</th>
                             </tr>
                           </thead>
@@ -423,7 +393,10 @@ function App() {
 
                               return (
                                 <tr key={group.customer + '-hist-' + idx} className={isRecent ? 'highlight-row' : ''}>
-                                  <td>{dep.project}</td>
+                                  <td>
+                                    <div>{dep.project}</div>
+                                    {dep.tag && <span className="project-tag">{dep.tag}</span>}
+                                  </td>
                                   <td>
                                     <span className="badge" style={{ backgroundColor: getEnvironmentBadge(dep.environment) }}>
                                       {dep.environment}
@@ -435,18 +408,17 @@ function App() {
                                     <a href={getGitHubUrl(dep.commit)} target="_blank" rel="noopener noreferrer" className="commit-link">
                                       {dep.commit.substring(0, 7)} ↗
                                     </a>
-                                    {/* 🔥 ALERT ICON LOGIC */}
                                     {hasChanges && (
-                                      <span 
-                                        className="alert-badge" 
-                                        title={`Uncommitted changes`}
-                                      >
-                                        ⚠️
-                                      </span>
+                                      <span className="alert-badge" title={`Uncommitted changes: ${dep.totalUncommitted || 0} files`}>⚠️</span>
                                     )}
                                   </td>
                                   <td>{dep.user}</td>
                                   <td>{formatDate(dep.releaseDate)}</td>
+                                  <td className="notes-cell">
+                                    {dep.notes && (
+                                      <span className="notes-icon" title={dep.notes}>📄</span>
+                                    )}
+                                  </td>
                                   <td>
                                     {isRecent && <span className="new-badge">NEW</span>}
                                   </td>
@@ -459,11 +431,7 @@ function App() {
                     )}
 
                     <div className="load-history-container">
-                      <button 
-                        onClick={() => loadCustomerHistory(group.customer)}
-                        disabled={group.loadingHistory}
-                        className="load-history-btn"
-                      >
+                      <button onClick={() => loadCustomerHistory(group.customer)} disabled={group.loadingHistory} className="load-history-btn">
                         {group.loadingHistory ? 'Loading...' : 'Load Older Deployments'}
                       </button>
                     </div>

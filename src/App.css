@@ -423,3 +423,40 @@
 .highlight-row .alert-badge {
   filter: drop-shadow(0 0 2px rgba(255, 0, 0, 0.5));
 }
+
+/* ... existing styles ... */
+
+/* Tag under project name */
+.project-tag {
+  display: inline-block;
+  font-size: 10px;
+  background-color: #e9ecef;
+  color: #495057;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-top: 4px;
+  font-weight: 600;
+  border: 1px solid #ced4da;
+}
+
+/* Notes column styling */
+.notes-cell {
+  text-align: center;
+  width: 50px;
+}
+
+.notes-icon {
+  font-size: 18px;
+  cursor: help;
+  transition: transform 0.2s;
+}
+
+.notes-icon:hover {
+  transform: scale(1.2);
+}
+
+/* Ensure columns align correctly */
+.deployment-table th:last-child,
+.deployment-table td:last-child {
+  text-align: center;
+}
