@@ -29,6 +29,10 @@ interface ApiResponse {
   results: Deployment[];
 }
 
+interface SettingsResponse {
+  useLogin: boolean;
+}
+
 interface CustomerGroup {
   customer: string;
   latest: Deployment[];
@@ -43,6 +47,13 @@ type Environment = 'PROD' | 'STAGE' | 'TEST';
 const GITHUB_ORG = "keros-dev";
 const GITHUB_REPO = "KNimbus-2017";
 const API_BASE_URL = "https://release-tracking-api.keros-digital.com";
+const AUTH_LOGIN_URL = API_BASE_URL + '/auth/login';
+const AUTH_PASSWORD_RESET_URL = API_BASE_URL + '/auth/password';
+const SETTINGS_URL = API_BASE_URL + '/release/settings';
+
+// 🔥 Session Duration: 7 days in milliseconds
+const SESSION_DURATION = 7 * 24 * 60 * 60 * 1000; 
+const STORAGE_KEY = 'deployTrackerSession';
 
 function App() {
   const [deployments, setDeployments] = useState<Deployment[]>([]);
@@ -50,7 +61,155 @@ function App() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedEnv, setSelectedEnv] = useState<Environment>('PROD');
+  
+  // 🔥 Auth States
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [requiresLogin, setRequiresLogin] = useState<boolean>(false); // From settings
+  const [loginLoading, setLoginLoading] = useState<boolean>(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [email, setEmail] = useState<string>('');
+  const [password, setPassword] = useState<string>('');
+  
+  // 🔥 Forgot Password States
+  const [showResetModal, setShowResetModal] = useState<boolean>(false);
+  const [resetEmail, setResetEmail] = useState<string>('');
+  const [resetLoading, setResetLoading] = useState<boolean>(false);
+  const [resetMessage, setResetMessage] = useState<string | null>(null);
+  const [resetError, setResetError] = useState<string | null>(null);
 
+  // 1. 🔥 CHECK SETTINGS ON MOUNT
+  useEffect(() => {
+    const initApp = async () => {
+      try {
+        const response = await fetch(SETTINGS_URL);
+        if (!response.ok) {
+          // If settings fail, assume login is not required to be safe, or show error
+          console.warn('Failed to fetch settings, assuming no login required');
+          setRequiresLogin(false);
+          setLoading(false);
+          return;
+        }
+        
+        const settings: SettingsResponse = await response.json();
+        setRequiresLogin(settings.useLogin);
+
+        if (!settings.useLogin) {
+          // No login required, fetch data immediately
+          setLoading(false);
+          fetchDeployments(selectedEnv);
+        } else {
+          // Login required, check session
+          const sessionData = localStorage.getItem(STORAGE_KEY);
+          if (sessionData) {
+            try {
+              const { validUntil } = JSON.parse(sessionData);
+              if (Date.now() < validUntil) {
+                setIsAuthenticated(true);
+                setLoading(false);
+                return;
+              }
+            } catch (e) {
+              console.error('Session parsing error', e);
+            }
+          }
+          // No valid session, show login
+          setLoading(false);
+        }
+      } catch (err) {
+        console.error('Error initializing app:', err);
+        setError('Failed to load application settings.');
+        setLoading(false);
+      }
+    };
+
+    initApp();
+  }, []);
+
+  // 2. FETCH DATA WHEN AUTHENTICATED OR SETTINGS ALLOW IT
+  useEffect(() => {
+    if (!requiresLogin || isAuthenticated) {
+      fetchDeployments(selectedEnv);
+    }
+  }, [isAuthenticated, requiresLogin, selectedEnv]);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginLoading(true);
+    setLoginError(null);
+
+    try {
+      const response = await fetch(AUTH_LOGIN_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+
+      // 🔥 Check Status Codes: 202 Accepted or 401 Unauthorized
+      if (response.status === 202) {
+        // Success
+        const validUntil = Date.now() + SESSION_DURATION;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ validUntil, email }));
+        setIsAuthenticated(true);
+      } else if (response.status === 401) {
+        throw new Error('Invalid credentials');
+      } else {
+        // Handle other unexpected status codes
+        const errorText = await response.text();
+        throw new Error(`Login failed: ${response.status} - ${errorText}`);
+      }
+      
+    } catch (err) {
+      setLoginError(err instanceof Error ? err.message : 'Login failed');
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setResetLoading(true);
+    setResetMessage(null);
+    setResetError(null);
+
+    try {
+      // 🔥 Payload format: { "Email": "..." } (Capital E)
+      const response = await fetch(AUTH_PASSWORD_RESET_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ Email: resetEmail })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to send reset email');
+      }
+
+      setResetMessage('Password reset email sent successfully!');
+      setTimeout(() => {
+        setShowResetModal(false);
+        setResetEmail('');
+        setResetMessage(null);
+      }, 3000);
+
+    } catch (err) {
+      setResetError(err instanceof Error ? err.message : 'Failed to send email');
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    localStorage.removeItem(STORAGE_KEY);
+    setDeployments([]);
+    setCustomerGroups([]);
+    setEmail('');
+    setPassword('');
+    setError(null);
+    setLoading(true);
+  };
+
+  // ... (Helper functions remain the same) ...
   const isNewDeployment = (dateString: string): boolean => {
     if (dateString === '0001-01-01T00:00:00') return false;
     const deployDate = new Date(dateString);
@@ -83,7 +242,6 @@ function App() {
 
   const initializeGroups = (latestList: Deployment[]): CustomerGroup[] => {
     const map = new Map<string, Deployment[]>();
-    
     latestList.forEach((dep) => {
       if (!map.has(dep.customer)) {
         map.set(dep.customer, []);
@@ -95,17 +253,9 @@ function App() {
       const sortedDeps = deps.sort(
         (a, b) => new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime()
       );
-      
       const latest = sortedDeps.slice(0, 5);
       const history = sortedDeps.slice(5);
-      
-      return {
-        customer,
-        latest,
-        history,
-        isExpanded: true,
-        loadingHistory: false
-      };
+      return { customer, latest, history, isExpanded: true, loadingHistory: false };
     });
 
     return result.sort((a, b) => {
@@ -116,6 +266,7 @@ function App() {
   };
 
   const fetchDeployments = async (env: Environment) => {
+    if (requiresLogin && !isAuthenticated) return;
     setLoading(true);
     setError(null);
     const apiUrl = API_BASE_URL + '/release/all/' + env;
@@ -139,6 +290,7 @@ function App() {
   };
 
   const loadCustomerHistory = async (customerName: string) => {
+    if (requiresLogin && !isAuthenticated) return;
     setCustomerGroups(prev => prev.map(group => 
       group.customer === customerName ? { ...group, loadingHistory: true } : group
     ));
@@ -170,11 +322,7 @@ function App() {
 
       setCustomerGroups(prev => prev.map(group => {
         if (group.customer !== customerName) return group;
-        return {
-          ...group,
-          history,
-          loadingHistory: false
-        };
+        return { ...group, history, loadingHistory: false };
       }));
     } catch (err) {
       console.error('Error loading history:', err);
@@ -228,26 +376,97 @@ function App() {
     return colors[env] || '#6c757d';
   };
 
-  // 🔥 UPDATED: Conditional GitHub URL based on project
   const getGitHubUrl = (commitHash: string, project?: string): string => {
-    // SAGA project uses Azure DevOps (Visual Studio)
     if (project === 'SAGA') {
       return 'https://keros-projects.visualstudio.com/Keros/_git/Keros.ServiceBus/commit/' + commitHash;
     }
-    // Default: GitHub
     return 'https://github.com/' + GITHUB_ORG + '/' + GITHUB_REPO + '/commit/' + commitHash;
   };
 
   const handleEnvChange = (event: React.ChangeEvent<HTMLSelectElement>): void => {
     const newEnv = event.target.value as Environment;
     setSelectedEnv(newEnv);
-    fetchDeployments(newEnv);
+    if (!requiresLogin || isAuthenticated) {
+      fetchDeployments(newEnv);
+    }
   };
 
-  useEffect(() => {
-    fetchDeployments(selectedEnv);
-  }, []);
+  // 🔥 LOGIN MODAL UI (Only if requiresLogin is true AND not authenticated)
+  if (requiresLogin && !isAuthenticated) {
+    return (
+      <div className="login-overlay">
+        <div className="login-box">
+          <div className="login-header">
+            <img src={companyLogo} alt="Logo" className="login-logo" />
+            <h2>Deploy Tracker</h2>
+          </div>
+          <form onSubmit={handleLogin}>
+            <div className="form-group">
+              <label>Email Address</label>
+              <input 
+                type="email" 
+                value={email} 
+                onChange={(e) => setEmail(e.target.value)} 
+                required 
+                autoFocus
+                placeholder="name@example.com"
+              />
+            </div>
+            <div className="form-group">
+              <label>Password</label>
+              <input 
+                type="password" 
+                value={password} 
+                onChange={(e) => setPassword(e.target.value)} 
+                required 
+              />
+            </div>
+            {loginError && <div className="login-error">{loginError}</div>}
+            <button type="submit" className="login-btn" disabled={loginLoading}>
+              {loginLoading ? 'Verifying...' : 'Login'}
+            </button>
+          </form>
+          <div className="forgot-password-link">
+            <button type="button" onClick={() => setShowResetModal(true)} className="link-btn">
+              Forgot Password?
+            </button>
+          </div>
+        </div>
 
+        {/* 🔥 RESET PASSWORD MODAL */}
+        {showResetModal && (
+          <div className="modal-overlay" onClick={() => setShowResetModal(false)}>
+            <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h3>Reset Password</h3>
+                <button className="close-btn" onClick={() => setShowResetModal(false)}>×</button>
+              </div>
+              <form onSubmit={handleResetPassword}>
+                <p>Enter your email address to receive a password reset link.</p>
+                <div className="form-group">
+                  <label>Email Address</label>
+                  <input 
+                    type="email" 
+                    value={resetEmail} 
+                    onChange={(e) => setResetEmail(e.target.value)} 
+                    required 
+                    autoFocus
+                  />
+                </div>
+                {resetMessage && <div className="success-message">{resetMessage}</div>}
+                {resetError && <div className="login-error">{resetError}</div>}
+                <button type="submit" className="login-btn" disabled={resetLoading}>
+                  {resetLoading ? 'Sending...' : 'Send Reset Link'}
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // MAIN APP UI (Shown if no login required OR if authenticated)
   return (
     <div className="App">
       <header className="App-header">
@@ -270,6 +489,9 @@ function App() {
           <button onClick={() => fetchDeployments(selectedEnv)} disabled={loading} className="refresh-btn">
             {loading ? 'Loading...' : 'Refresh'}
           </button>
+          {requiresLogin && (
+            <button onClick={handleLogout} className="logout-btn">Logout</button>
+          )}
         </div>
       </header>
       
@@ -315,7 +537,6 @@ function App() {
 
                 {group.isExpanded && (
                   <>
-                    {/* MAIN TABLE */}
                     <table className="deployment-table">
                       <thead>
                         <tr>
@@ -334,7 +555,6 @@ function App() {
                         {group.latest.map((dep, idx) => {
                           const isRecent = isNewDeployment(dep.releaseDate);
                           const hasChanges = hasUncommittedChanges(dep);
-                          
                           return (
                             <tr key={group.customer + '-latest-' + idx} className={isRecent ? 'highlight-row' : ''}>
                               <td>
@@ -349,7 +569,6 @@ function App() {
                               <td><b>{dep.branch}</b></td>
                               <td>{formatDate(dep.buildDate)}</td>
                               <td className="commit">
-                                {/* 🔥 PASS PROJECT NAME TO getGitHubUrl */}
                                 <a href={getGitHubUrl(dep.commit, dep.project)} target="_blank" rel="noopener noreferrer" className="commit-link">
                                   {dep.commit.substring(0, 7)} ↗
                                 </a>
@@ -360,9 +579,7 @@ function App() {
                               <td>{dep.user}</td>
                               <td>{formatDate(dep.releaseDate)}</td>
                               <td className="notes-cell">
-                                {dep.notes && (
-                                  <span className="notes-icon" title={dep.notes}>📄</span>
-                                )}
+                                {dep.notes && <span className="notes-icon" title={dep.notes}>📄</span>}
                               </td>
                               <td>
                                 {isRecent && <span className="new-badge">NEW</span>}
@@ -373,7 +590,6 @@ function App() {
                       </tbody>
                     </table>
 
-                    {/* HISTORY TABLE */}
                     {group.history.length > 0 && (
                       <div className="history-section">
                         <h4 className="history-title">Older Deployments</h4>
@@ -395,7 +611,6 @@ function App() {
                             {group.history.map((dep, idx) => {
                               const isRecent = isNewDeployment(dep.releaseDate);
                               const hasChanges = hasUncommittedChanges(dep);
-
                               return (
                                 <tr key={group.customer + '-hist-' + idx} className={isRecent ? 'highlight-row' : ''}>
                                   <td>
@@ -410,7 +625,6 @@ function App() {
                                   <td><b>{dep.branch}</b></td>
                                   <td>{formatDate(dep.buildDate)}</td>
                                   <td className="commit">
-                                    {/* 🔥 PASS PROJECT NAME TO getGitHubUrl */}
                                     <a href={getGitHubUrl(dep.commit, dep.project)} target="_blank" rel="noopener noreferrer" className="commit-link">
                                       {dep.commit.substring(0, 7)} ↗
                                     </a>
@@ -421,9 +635,7 @@ function App() {
                                   <td>{dep.user}</td>
                                   <td>{formatDate(dep.releaseDate)}</td>
                                   <td className="notes-cell">
-                                    {dep.notes && (
-                                      <span className="notes-icon" title={dep.notes}>📄</span>
-                                    )}
+                                    {dep.notes && <span className="notes-icon" title={dep.notes}>📄</span>}
                                   </td>
                                   <td>
                                     {isRecent && <span className="new-badge">NEW</span>}
