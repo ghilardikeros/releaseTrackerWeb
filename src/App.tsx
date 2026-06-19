@@ -50,6 +50,7 @@ const API_BASE_URL = "https://release-tracking-api.keros-digital.com";
 const AUTH_LOGIN_URL = API_BASE_URL + '/auth/login';
 const AUTH_PASSWORD_RESET_URL = API_BASE_URL + '/auth/password';
 const SETTINGS_URL = API_BASE_URL + '/release/settings';
+const ALERTS_URL = API_BASE_URL + '/release/alerts';
 
 // 🔥 Session Duration: 7 days in milliseconds
 const SESSION_DURATION = 7 * 24 * 60 * 60 * 1000; 
@@ -61,10 +62,11 @@ function App() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedEnv, setSelectedEnv] = useState<Environment>('PROD');
+  const [alerts, setAlerts] = useState<string[]>([]);
   
   // 🔥 Auth States
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-  const [requiresLogin, setRequiresLogin] = useState<boolean>(false); // From settings
+  const [requiresLogin, setRequiresLogin] = useState<boolean>(false);
   const [loginLoading, setLoginLoading] = useState<boolean>(false);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [email, setEmail] = useState<string>('');
@@ -77,28 +79,31 @@ function App() {
   const [resetMessage, setResetMessage] = useState<string | null>(null);
   const [resetError, setResetError] = useState<string | null>(null);
 
-  // 1. 🔥 CHECK SETTINGS ON MOUNT
+  // 1. CHECK SETTINGS & FETCH ALERTS ON MOUNT
   useEffect(() => {
     const initApp = async () => {
       try {
-        const response = await fetch(SETTINGS_URL);
-        if (!response.ok) {
-          // If settings fail, assume login is not required to be safe, or show error
-          console.warn('Failed to fetch settings, assuming no login required');
+        const settingsResponse = await fetch(SETTINGS_URL);
+        if (!settingsResponse.ok) {
           setRequiresLogin(false);
-          setLoading(false);
-          return;
+        } else {
+          const settings: SettingsResponse = await settingsResponse.json();
+          setRequiresLogin(settings.useLogin);
         }
-        
-        const settings: SettingsResponse = await response.json();
-        setRequiresLogin(settings.useLogin);
 
-        if (!settings.useLogin) {
-          // No login required, fetch data immediately
+        // Fetch alerts (we fetch them on load, but only show if PROD)
+        const alertsResponse = await fetch(ALERTS_URL);
+        if (alertsResponse.ok) {
+          const alertsData: string[] = await alertsResponse.json();
+          setAlerts(alertsData);
+        } else {
+          setAlerts([]);
+        }
+
+        if (!requiresLogin) {
           setLoading(false);
           fetchDeployments(selectedEnv);
         } else {
-          // Login required, check session
           const sessionData = localStorage.getItem(STORAGE_KEY);
           if (sessionData) {
             try {
@@ -112,7 +117,6 @@ function App() {
               console.error('Session parsing error', e);
             }
           }
-          // No valid session, show login
           setLoading(false);
         }
       } catch (err) {
@@ -144,16 +148,13 @@ function App() {
         body: JSON.stringify({ email, password })
       });
 
-      // 🔥 Check Status Codes: 202 Accepted or 401 Unauthorized
       if (response.status === 202) {
-        // Success
         const validUntil = Date.now() + SESSION_DURATION;
         localStorage.setItem(STORAGE_KEY, JSON.stringify({ validUntil, email }));
         setIsAuthenticated(true);
       } else if (response.status === 401) {
         throw new Error('Invalid credentials');
       } else {
-        // Handle other unexpected status codes
         const errorText = await response.text();
         throw new Error(`Login failed: ${response.status} - ${errorText}`);
       }
@@ -172,7 +173,6 @@ function App() {
     setResetError(null);
 
     try {
-      // 🔥 Payload format: { "Email": "..." } (Capital E)
       const response = await fetch(AUTH_PASSWORD_RESET_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -209,7 +209,6 @@ function App() {
     setLoading(true);
   };
 
-  // ... (Helper functions remain the same) ...
   const isNewDeployment = (dateString: string): boolean => {
     if (dateString === '0001-01-01T00:00:00') return false;
     const deployDate = new Date(dateString);
@@ -391,7 +390,7 @@ function App() {
     }
   };
 
-  // 🔥 LOGIN MODAL UI (Only if requiresLogin is true AND not authenticated)
+  // 🔥 LOGIN MODAL UI
   if (requiresLogin && !isAuthenticated) {
     return (
       <div className="login-overlay">
@@ -400,6 +399,9 @@ function App() {
             <img src={companyLogo} alt="Logo" className="login-logo" />
             <h2>Deploy Tracker</h2>
           </div>
+          
+          {/* 🔥 NO ALERTS HERE (Only shown on PROD page after login or if no login required) */}
+
           <form onSubmit={handleLogin}>
             <div className="form-group">
               <label>Email Address</label>
@@ -433,7 +435,6 @@ function App() {
           </div>
         </div>
 
-        {/* 🔥 RESET PASSWORD MODAL */}
         {showResetModal && (
           <div className="modal-overlay" onClick={() => setShowResetModal(false)}>
             <div className="modal-box" onClick={(e) => e.stopPropagation()}>
@@ -466,7 +467,7 @@ function App() {
     );
   }
 
-  // MAIN APP UI (Shown if no login required OR if authenticated)
+  // MAIN APP UI
   return (
     <div className="App">
       <header className="App-header">
@@ -494,6 +495,17 @@ function App() {
           )}
         </div>
       </header>
+      
+      {/* 🔥 ONLY SHOW ALERTS IF ENVIRONMENT IS PROD */}
+      {alerts.length > 0 && selectedEnv === 'PROD' && (
+        <div className="alerts-container">
+          {alerts.map((alert, idx) => (
+            <div key={idx} className="alert-banner">
+              ⚠️ {alert}
+            </div>
+          ))}
+        </div>
+      )}
       
       <main className="App-main">
         {loading && <div className="loading"><div className="spinner"></div><p>Loading data from {selectedEnv}...</p></div>}
