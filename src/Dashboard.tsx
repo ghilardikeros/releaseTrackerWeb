@@ -65,6 +65,7 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [selectedEnv, setSelectedEnv] = useState<Environment>('PROD');
   const [alerts, setAlerts] = useState<string[]>([]);
+  const [alertsExpanded, setAlertsExpanded] = useState<boolean>(false);
   
   // 🔥 Auth States
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
@@ -256,14 +257,10 @@ function App() {
       );
       const latest = sortedDeps.slice(0, 5);
       const history = sortedDeps.slice(5);
-      return { customer, latest, history, isExpanded: true, loadingHistory: false };
+      return { customer, latest, history, isExpanded: false, loadingHistory: false };
     });
 
-    return result.sort((a, b) => {
-      const dateA = a.latest.length > 0 ? new Date(a.latest[0].releaseDate).getTime() : 0;
-      const dateB = b.latest.length > 0 ? new Date(b.latest[0].releaseDate).getTime() : 0;
-      return dateB - dateA;
-    });
+    return result.sort((a, b) => a.customer.localeCompare(b.customer, undefined, { sensitivity: 'base' }));
   };
 
   const fetchDeployments = async (env: Environment) => {
@@ -505,7 +502,15 @@ function App() {
       {/* 🔥 ONLY SHOW ALERTS IF ENVIRONMENT IS PROD */}
       {alerts.length > 0 && selectedEnv === 'PROD' && (
         <div className="alerts-container">
-          {alerts.map((alert, idx) => (
+          <div
+            className="alerts-header"
+            onClick={() => setAlertsExpanded(!alertsExpanded)}
+            style={{ cursor: 'pointer', fontWeight: 'bold', marginBottom: alertsExpanded ? 8 : 0 }}
+          >
+            <span className={'toggle-icon ' + (alertsExpanded ? 'expanded' : 'collapsed')}>▶</span>
+            {' '}⚠️ Alerts ({alerts.length})
+          </div>
+          {alertsExpanded && alerts.map((alert, idx) => (
             <div key={idx} className="alert-banner">
               ⚠️ {alert}
             </div>
@@ -550,6 +555,7 @@ function App() {
                     {group.history.length > 0 
                       ? group.latest.length + ' latest + ' + group.history.length + ' older' 
                       : group.latest.length + ' latest deployments'}
+                    {group.latest.length > 0 && ' · Newest: ' + formatDate(group.latest[0].releaseDate)}
                   </span>
                 </div>
 
