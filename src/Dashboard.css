@@ -272,6 +272,10 @@ body {
   margin-top: 10px;
 }
 
+.customer-group.recent {
+  border: 2px solid #28a745;
+}
+
 .customer-group {
   margin-bottom: 20px;
   border: 1px solid #e2e8f0;

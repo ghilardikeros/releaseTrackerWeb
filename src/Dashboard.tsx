@@ -17,6 +17,9 @@ interface Deployment {
   releaseDate: string;
   buildDate: string;
   totalUncommitted?: number;
+  logo?: string | null;
+  gitUrl?: string | null;
+  customerFullName?: string | null;
   untrackedFiles?: string[];
   modifiedFiles?: string[];
   stagedFiles?: string[];
@@ -37,6 +40,8 @@ interface SettingsResponse {
 
 interface CustomerGroup {
   customer: string;
+  fullName?: string;
+  logo?: string;
   latest: Deployment[];
   history: Deployment[];
   isExpanded: boolean;
@@ -257,7 +262,9 @@ function App() {
       );
       const latest = sortedDeps.slice(0, 5);
       const history = sortedDeps.slice(5);
-      return { customer, latest, history, isExpanded: false, loadingHistory: false };
+      const logo = sortedDeps.find((d) => d.logo)?.logo || undefined;
+      const fullName = sortedDeps.find((d) => d.customerFullName)?.customerFullName || undefined;
+      return { customer, fullName, logo, latest, history, isExpanded: false, loadingHistory: false };
     });
 
     return result.sort((a, b) => a.customer.localeCompare(b.customer, undefined, { sensitivity: 'base' }));
@@ -365,6 +372,14 @@ function App() {
     } catch (e) { return '-'; }
   };
 
+  const formatDateDMY = (dateString: string): string => {
+    const ymd = formatDate(dateString);
+    if (ymd === '-') return ymd;
+    const [datePart, timePart] = ymd.split(' ');
+    const [y, m, d] = datePart.split('/');
+    return `${d}/${m}/${y} ${timePart}`;
+  };
+
   const getEnvironmentBadge = (env: string) => {
     const colors: Record<string, string> = {
       PROD: '#dc3545',
@@ -374,7 +389,10 @@ function App() {
     return colors[env] || '#6c757d';
   };
 
-  const getGitHubUrl = (commitHash: string, project?: string): string => {
+  const getGitHubUrl = (commitHash: string, project?: string, gitUrl?: string | null): string => {
+    if (gitUrl) {
+      return gitUrl.replace(/\/+$/, '') + '/' + commitHash;
+    }
     if (project === 'SAGA') {
       return 'https://keros-projects.visualstudio.com/Keros/_git/Keros.ServiceBus/commit/' + commitHash;
     }
@@ -547,15 +565,31 @@ function App() {
             </div>
 
             {customerGroups.map((group, groupIndex) => (
-              <div key={group.customer} className="customer-group">
+              <div key={group.customer} className={'customer-group' + (group.latest.length > 0 && isNewDeployment(group.latest[0].releaseDate) ? ' recent' : '')}>
                 <div className="customer-header" onClick={() => toggleCustomerGroup(groupIndex)}>
                   <span className={'toggle-icon ' + (group.isExpanded ? 'expanded' : 'collapsed')}>▶</span>
-                  <span className="customer-name">{group.customer}</span>
+                  <span className="customer-name">
+                    {group.logo && (
+                      <img
+                        src={API_BASE_URL + group.logo}
+                        alt={group.customer + ' logo'}
+                        style={{ height: 50, marginRight: 10, verticalAlign: 'middle' }}
+                      />
+                    )}
+                    {group.fullName || group.customer}
+                  </span>
                   <span className="deployment-count">
                     {group.history.length > 0 
                       ? group.latest.length + ' latest + ' + group.history.length + ' older' 
                       : group.latest.length + ' latest deployments'}
-                    {group.latest.length > 0 && ' · Newest: ' + formatDate(group.latest[0].releaseDate)}
+                    {group.latest.length > 0 && (
+                      <>
+                        {' · Newest: '}
+                        {isNewDeployment(group.latest[0].releaseDate)
+                          ? <strong>{formatDateDMY(group.latest[0].releaseDate)}</strong>
+                          : formatDateDMY(group.latest[0].releaseDate)}
+                      </>
+                    )}
                   </span>
                 </div>
 
@@ -593,7 +627,7 @@ function App() {
                               <td><b>{dep.branch}</b></td>
                               <td>{formatDate(dep.buildDate)}</td>
                               <td className="commit">
-                                <a href={getGitHubUrl(dep.commit, dep.project)} target="_blank" rel="noopener noreferrer" className="commit-link">
+                                <a href={getGitHubUrl(dep.commit, dep.project, dep.gitUrl)} target="_blank" rel="noopener noreferrer" className="commit-link">
                                   {dep.commit.substring(0, 7)} ↗
                                 </a>
                                 {hasChanges && (
@@ -649,7 +683,7 @@ function App() {
                                   <td><b>{dep.branch}</b></td>
                                   <td>{formatDate(dep.buildDate)}</td>
                                   <td className="commit">
-                                    <a href={getGitHubUrl(dep.commit, dep.project)} target="_blank" rel="noopener noreferrer" className="commit-link">
+                                    <a href={getGitHubUrl(dep.commit, dep.project, dep.gitUrl)} target="_blank" rel="noopener noreferrer" className="commit-link">
                                       {dep.commit.substring(0, 7)} ↗
                                     </a>
                                     {hasChanges && (
