@@ -70,7 +70,6 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [selectedEnv, setSelectedEnv] = useState<Environment>('PROD');
   const [alerts, setAlerts] = useState<string[]>([]);
-  const [alertsExpanded, setAlertsExpanded] = useState<boolean>(false);
   
   // 🔥 Auth States
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
@@ -226,7 +225,19 @@ function App() {
     return diffDays <= 7;
   };
 
-  const hasUncommittedChanges = (dep: Deployment): boolean => {
+  const getGroupAgeClass = (group: CustomerGroup): string => {
+    if (selectedEnv !== 'PROD' || group.latest.length === 0) return '';
+    const dateString = group.latest[0].releaseDate;
+    if (dateString === '0001-01-01T00:00:00') return '';
+    const time = new Date(dateString).getTime();
+    if (isNaN(time)) return '';
+    const diffDays = (Date.now() - time) / (1000 * 60 * 60 * 24);
+    if (diffDays > 90) return ' age-critical';
+    if (diffDays > 30) return ' age-warning';
+    return diffDays <= 7 ? ' recent' : '';
+  };
+
+  const hasUncommittedChanges =(dep: Deployment): boolean => {
     if (!dep) return false;
     const hasTotal = (dep.totalUncommitted ?? 0) > 0;
     const hasUntracked = (dep.untrackedFiles?.length ?? 0) > 0;
@@ -517,25 +528,6 @@ function App() {
         </div>
       </header>
       
-      {/* 🔥 ONLY SHOW ALERTS IF ENVIRONMENT IS PROD */}
-      {alerts.length > 0 && selectedEnv === 'PROD' && (
-        <div className="alerts-container">
-          <div
-            className="alerts-header"
-            onClick={() => setAlertsExpanded(!alertsExpanded)}
-            style={{ cursor: 'pointer', fontWeight: 'bold', marginBottom: alertsExpanded ? 8 : 0 }}
-          >
-            <span className={'toggle-icon ' + (alertsExpanded ? 'expanded' : 'collapsed')}>▶</span>
-            {' '}⚠️ Alerts ({alerts.length})
-          </div>
-          {alertsExpanded && alerts.map((alert, idx) => (
-            <div key={idx} className="alert-banner">
-              ⚠️ {alert}
-            </div>
-          ))}
-        </div>
-      )}
-      
       <main className="App-main">
         {loading && <div className="loading"><div className="spinner"></div><p>Loading data from {selectedEnv}...</p></div>}
         
@@ -565,7 +557,7 @@ function App() {
             </div>
 
             {customerGroups.map((group, groupIndex) => (
-              <div key={group.customer} className={'customer-group' + (group.latest.length > 0 && isNewDeployment(group.latest[0].releaseDate) ? ' recent' : '')}>
+              <div key={group.customer} className={'customer-group' + getGroupAgeClass(group)}>
                 <div className="customer-header" onClick={() => toggleCustomerGroup(groupIndex)}>
                   <span className={'toggle-icon ' + (group.isExpanded ? 'expanded' : 'collapsed')}>▶</span>
                   <span className="customer-name">
