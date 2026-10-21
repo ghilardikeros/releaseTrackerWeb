@@ -225,16 +225,14 @@ function App() {
     return diffDays <= 7;
   };
 
-  const getGroupAgeClass = (group: CustomerGroup): string => {
-    if (selectedEnv !== 'PROD' || group.latest.length === 0) return '';
+  // Age in whole days of the group's newest release (PROD only), or null if not applicable
+  const getGroupAgeDays = (group: CustomerGroup): number | null => {
+    if (selectedEnv !== 'PROD' || group.latest.length === 0) return null;
     const dateString = group.latest[0].releaseDate;
-    if (dateString === '0001-01-01T00:00:00') return '';
+    if (dateString === '0001-01-01T00:00:00') return null;
     const time = new Date(dateString).getTime();
-    if (isNaN(time)) return '';
-    const diffDays = (Date.now() - time) / (1000 * 60 * 60 * 24);
-    if (diffDays > 90) return ' age-critical';
-    if (diffDays > 30) return ' age-warning';
-    return diffDays <= 7 ? ' recent' : '';
+    if (isNaN(time)) return null;
+    return Math.floor((Date.now() - time) / (1000 * 60 * 60 * 24));
   };
 
   const hasUncommittedChanges =(dep: Deployment): boolean => {
@@ -556,8 +554,11 @@ function App() {
               </div>
             </div>
 
-            {customerGroups.map((group, groupIndex) => (
-              <div key={group.customer} className={'customer-group' + getGroupAgeClass(group)}>
+            {customerGroups.map((group, groupIndex) => {
+              const ageDays = getGroupAgeDays(group);
+              return (
+              <div key={group.customer} className="customer-group">
+                {ageDays !== null && ageDays <= 7 && <div className="new-banner">NEW</div>}
                 <div className="customer-header" onClick={() => toggleCustomerGroup(groupIndex)}>
                   <span className={'toggle-icon ' + (group.isExpanded ? 'expanded' : 'collapsed')}>▶</span>
                   <span className="customer-name">
@@ -584,6 +585,12 @@ function App() {
                     )}
                   </span>
                 </div>
+
+                {ageDays !== null && ageDays > 30 && (
+                  <div className={'age-banner ' + (ageDays > 90 ? 'age-critical' : 'age-warning')}>
+                    ⚠️ Last release {ageDays} days ago
+                  </div>
+                )}
 
                 {group.isExpanded && (
                   <>
@@ -706,7 +713,8 @@ function App() {
                   </>
                 )}
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </main>
