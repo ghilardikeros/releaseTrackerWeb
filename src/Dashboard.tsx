@@ -235,6 +235,22 @@ function App() {
     return Math.floor((Date.now() - time) / (1000 * 60 * 60 * 24));
   };
 
+  // Age in days of the newest release for each tracked project of a group (PROD only)
+  const AGE_PROJECTS = ['BE', 'BEAPI', 'JOBS', 'SAGA'];
+  const getProjectAges = (group: CustomerGroup): { project: string; days: number }[] => {
+    if (selectedEnv !== 'PROD') return [];
+    const newest = new Map<string, number>();
+    [...group.latest, ...group.history].forEach((dep) => {
+      if (!AGE_PROJECTS.includes(dep.project) || dep.releaseDate === '0001-01-01T00:00:00') return;
+      const time = new Date(dep.releaseDate).getTime();
+      if (isNaN(time)) return;
+      if (!newest.has(dep.project) || time > newest.get(dep.project)!) newest.set(dep.project, time);
+    });
+    return AGE_PROJECTS
+      .filter((p) => newest.has(p))
+      .map((p) => ({ project: p, days: Math.floor((Date.now() - newest.get(p)!) / (1000 * 60 * 60 * 24)) }));
+  };
+
   const hasUncommittedChanges =(dep: Deployment): boolean => {
     if (!dep) return false;
     const hasTotal = (dep.totalUncommitted ?? 0) > 0;
@@ -556,6 +572,7 @@ function App() {
 
             {customerGroups.map((group, groupIndex) => {
               const ageDays = getGroupAgeDays(group);
+              const oldProjects = getProjectAges(group).filter((p) => p.days > 30);
               return (
               <div key={group.customer} className="customer-group">
                 {ageDays !== null && ageDays <= 7 && <div className="new-banner">NEW</div>}
@@ -586,9 +603,15 @@ function App() {
                   </span>
                 </div>
 
-                {ageDays !== null && ageDays > 30 && (
-                  <div className={'age-banner ' + (ageDays > 90 ? 'age-critical' : 'age-warning')}>
-                    ⚠️ Last release {ageDays} days ago
+                {oldProjects.length > 0 && (
+                  <div className={'age-banner ' + (oldProjects.some((p) => p.days > 90) ? 'age-critical' : 'age-warning')}>
+                    ⚠️ Last release:{' '}
+                    {oldProjects.map((p, i) => (
+                      <span key={p.project}>
+                        {i > 0 && ' · '}
+                        {p.project} {p.days} days ago
+                      </span>
+                    ))}
                   </div>
                 )}
 
